@@ -2,10 +2,12 @@ package com.example.smartpantrymanager;
 
 import android.os.Bundle;
 import android.text.InputType;
-import android.view.ViewGroup;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -15,7 +17,14 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.util.ArrayList;
+
 public class MainActivity extends AppCompatActivity {
+
+    private LinearLayout pantryIngredientsContainer;
+    private ScrollView pantryListScroll;
+    private TextView emptyPantryMessage;
+    private final ArrayList<String> ingredients = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,9 +34,18 @@ public class MainActivity extends AppCompatActivity {
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (view, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            view.setPadding(
+                    systemBars.left,
+                    systemBars.top,
+                    systemBars.right,
+                    systemBars.bottom
+            );
             return insets;
         });
+
+        pantryIngredientsContainer = findViewById(R.id.pantryIngredientsContainer);
+        pantryListScroll = findViewById(R.id.pantryListScroll);
+        emptyPantryMessage = findViewById(R.id.emptyPantryMessage);
 
         Button addIngredientButton = findViewById(R.id.addIngredientButton);
         addIngredientButton.setOnClickListener(view -> showAddIngredientForm());
@@ -53,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
         form.addView(quantityInput);
 
         EditText unitInput = new EditText(this);
-        unitInput.setHint("Unit (for example, pieces or cups)");
+        unitInput.setHint("Unit, for example pieces or cups");
         unitInput.setInputType(InputType.TYPE_CLASS_TEXT);
         form.addView(unitInput);
 
@@ -61,7 +79,8 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Add ingredient")
                 .setView(form)
                 .setPositiveButton("Add", null)
-                .setNegativeButton("Cancel", (dialogInterface, which) -> dialogInterface.dismiss())
+                .setNegativeButton("Cancel", (dialogInterface, which) ->
+                        dialogInterface.dismiss())
                 .create();
 
         dialog.setOnShowListener(dialogInterface ->
@@ -71,18 +90,35 @@ public class MainActivity extends AppCompatActivity {
                     String unit = unitInput.getText().toString().trim();
 
                     if (name.isEmpty() || quantity.isEmpty() || unit.isEmpty()) {
-                        Toast.makeText(this, "Please fill in all fields.", Toast.LENGTH_SHORT).show();
-                    } else {
                         Toast.makeText(
                                 this,
-                                name + ": " + quantity + " " + unit,
+                                "Please fill in all fields.",
                                 Toast.LENGTH_SHORT
                         ).show();
-                        dialog.dismiss();
+                        return;
                     }
+
+                    String ingredient = name + " — " + quantity + " " + unit;
+                    ingredients.add(ingredient);
+                    addIngredientToScreen(ingredient);
+                    dialog.dismiss();
                 })
         );
 
         dialog.show();
+    }
+
+    private void addIngredientToScreen(String ingredient) {
+        TextView ingredientRow = new TextView(this);
+        ingredientRow.setText(ingredient);
+        ingredientRow.setTextSize(18);
+        ingredientRow.setTextColor(0xFF29252F);
+
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        ingredientRow.setPadding(padding, padding, padding, padding);
+
+        pantryIngredientsContainer.addView(ingredientRow);
+        emptyPantryMessage.setVisibility(View.GONE);
+        pantryListScroll.setVisibility(View.VISIBLE);
     }
 }
