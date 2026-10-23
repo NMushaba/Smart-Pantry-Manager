@@ -221,15 +221,48 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        StringBuilder message = new StringBuilder();
-        for (String recipe : matchingRecipes) {
-            message.append("• ").append(recipe).append("\n");
-        }
+        String[] recipeNames = matchingRecipes.toArray(new String[0]);
 
         new AlertDialog.Builder(this)
                 .setTitle("Recipes you can make")
-                .setMessage(message.toString().trim())
-                .setPositiveButton("OK", null)
+                .setItems(recipeNames, (dialog, which) ->
+                        showRecipeInstructions(recipeNames[which]))
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void showRecipeInstructions(String recipeName) {
+        String instructions;
+
+        switch (recipeName) {
+            case "Tomato and egg scramble":
+                instructions = "1. Wash and chop the tomato.\n"
+                        + "2. Beat the eggs in a bowl.\n"
+                        + "3. Cook the tomato in a pan for a few minutes.\n"
+                        + "4. Add the eggs and stir until fully cooked.";
+                break;
+
+            case "Egg toast":
+                instructions = "1. Toast the bread.\n"
+                        + "2. Cook the egg in a pan until done.\n"
+                        + "3. Place the cooked egg on the toast and serve.";
+                break;
+
+            case "Tomato and cucumber salad":
+                instructions = "1. Wash the tomato and cucumber.\n"
+                        + "2. Chop them into small pieces.\n"
+                        + "3. Mix together in a bowl and serve.";
+                break;
+
+            default:
+                instructions = "Instructions are not available for this recipe.";
+                break;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(recipeName)
+                .setMessage(instructions)
+                .setPositiveButton("Close", null)
                 .show();
     }
 
