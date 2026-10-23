@@ -59,6 +59,9 @@ public class MainActivity extends AppCompatActivity {
 
         Button addIngredientButton = findViewById(R.id.addIngredientButton);
         addIngredientButton.setOnClickListener(view -> showAddIngredientForm());
+
+        Button findRecipesButton = findViewById(R.id.findRecipesButton);
+        findRecipesButton.setOnClickListener(view -> showRecipeSuggestions());
     }
 
     private void showAddIngredientForm() {
@@ -192,5 +195,64 @@ public class MainActivity extends AppCompatActivity {
             emptyPantryMessage.setVisibility(View.VISIBLE);
             pantryListScroll.setVisibility(View.GONE);
         }
+    }
+
+    private void showRecipeSuggestions() {
+        ArrayList<String> matchingRecipes = new ArrayList<>();
+
+        if (hasIngredients("tomato", "egg")) {
+            matchingRecipes.add("Tomato and egg scramble");
+        }
+
+        if (hasIngredients("egg", "bread")) {
+            matchingRecipes.add("Egg toast");
+        }
+
+        if (hasIngredients("tomato", "cucumber")) {
+            matchingRecipes.add("Tomato and cucumber salad");
+        }
+
+        if (matchingRecipes.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("No recipes available yet")
+                    .setMessage("Add more ingredients to your pantry and check again.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        StringBuilder message = new StringBuilder();
+        for (String recipe : matchingRecipes) {
+            message.append("• ").append(recipe).append("\n");
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Recipes you can make")
+                .setMessage(message.toString().trim())
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private boolean hasIngredients(String... requiredIngredients) {
+        for (String required : requiredIngredients) {
+            if (!hasIngredient(required)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasIngredient(String requiredIngredient) {
+        for (String savedIngredient : ingredients) {
+            String[] parts = savedIngredient.split(" — ", 2);
+            String name = parts[0].trim().toLowerCase();
+
+            if (name.equals(requiredIngredient)
+                    || name.equals(requiredIngredient + "s")
+                    || (requiredIngredient.equals("tomato") && name.equals("tomatoes"))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
