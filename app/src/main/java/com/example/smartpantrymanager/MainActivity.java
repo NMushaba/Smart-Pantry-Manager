@@ -102,11 +102,7 @@ public class MainActivity extends AppCompatActivity {
                     String unit = unitInput.getText().toString().trim();
 
                     if (name.isEmpty() || quantityText.isEmpty() || unit.isEmpty()) {
-                        Toast.makeText(
-                                this,
-                                "Please fill in all fields.",
-                                Toast.LENGTH_SHORT
-                        ).show();
+                        Toast.makeText(this, "Please fill in all fields.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
@@ -114,11 +110,7 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         quantity = Double.parseDouble(quantityText);
                     } catch (NumberFormatException exception) {
-                        Toast.makeText(
-                                this,
-                                "Enter a valid quantity.",
-                                Toast.LENGTH_SHORT
-                        ).show();
+                        Toast.makeText(this, "Enter a valid quantity.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
@@ -145,6 +137,103 @@ public class MainActivity extends AppCompatActivity {
                     ingredients.add(name);
                     addIngredientToScreen(itemId, name, quantity, unit);
                     dialog.dismiss();
+                })
+        );
+
+        dialog.show();
+    }
+
+    private void showEditIngredientForm(
+            long itemId,
+            String oldName,
+            double oldQuantity,
+            String oldUnit,
+            TextView ingredientText
+    ) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        form.setPadding(padding, 0, padding, 0);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setHint("Ingredient name");
+        nameInput.setText(oldName);
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        form.addView(nameInput);
+
+        EditText quantityInput = new EditText(this);
+        quantityInput.setHint("Quantity");
+        quantityInput.setText(String.valueOf(oldQuantity));
+        quantityInput.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        form.addView(quantityInput);
+
+        EditText unitInput = new EditText(this);
+        unitInput.setHint("Unit, for example pieces or cups");
+        unitInput.setText(oldUnit);
+        unitInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        form.addView(unitInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Edit ingredient")
+                .setView(form)
+                .setPositiveButton("Save", null)
+                .setNegativeButton("Cancel", (dialogInterface, which) ->
+                        dialogInterface.dismiss())
+                .create();
+
+        dialog.setOnShowListener(dialogInterface ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    String newName = nameInput.getText().toString().trim();
+                    String quantityText = quantityInput.getText().toString().trim();
+                    String newUnit = unitInput.getText().toString().trim();
+
+                    if (newName.isEmpty() || quantityText.isEmpty() || newUnit.isEmpty()) {
+                        Toast.makeText(this, "Please fill in all fields.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    double newQuantity;
+                    try {
+                        newQuantity = Double.parseDouble(quantityText);
+                    } catch (NumberFormatException exception) {
+                        Toast.makeText(this, "Enter a valid quantity.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (newQuantity <= 0) {
+                        Toast.makeText(
+                                this,
+                                "Quantity must be greater than zero.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
+
+                    int updatedRows = databaseHelper.updatePantryItem(
+                            itemId,
+                            newName,
+                            newQuantity,
+                            newUnit
+                    );
+
+                    if (updatedRows > 0) {
+                        ingredients.remove(oldName);
+                        ingredients.add(newName);
+                        ingredientText.setText(
+                                newName + " — " + newQuantity + " " + newUnit
+                        );
+                        Toast.makeText(this, "Ingredient updated.", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    } else {
+                        Toast.makeText(
+                                this,
+                                "The ingredient could not be updated.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
                 })
         );
 
@@ -204,6 +293,13 @@ public class MainActivity extends AppCompatActivity {
         );
         row.addView(ingredientText, textParams);
 
+        Button editButton = new Button(this);
+        editButton.setText("Edit");
+        row.addView(editButton);
+
+        editButton.setOnClickListener(view ->
+                showEditIngredientForm(itemId, name, quantity, unit, ingredientText));
+
         Button removeButton = new Button(this);
         removeButton.setText("Remove");
         row.addView(removeButton);
@@ -225,12 +321,8 @@ public class MainActivity extends AppCompatActivity {
     private void updatePantryVisibility() {
         boolean pantryIsEmpty = ingredients.isEmpty();
 
-        emptyPantryMessage.setVisibility(
-                pantryIsEmpty ? View.VISIBLE : View.GONE
-        );
-        pantryListScroll.setVisibility(
-                pantryIsEmpty ? View.GONE : View.VISIBLE
-        );
+        emptyPantryMessage.setVisibility(pantryIsEmpty ? View.VISIBLE : View.GONE);
+        pantryListScroll.setVisibility(pantryIsEmpty ? View.GONE : View.VISIBLE);
     }
 
     private void showRecipeSuggestions() {
