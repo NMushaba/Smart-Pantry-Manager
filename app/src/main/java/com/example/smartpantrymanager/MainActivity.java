@@ -297,94 +297,211 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showRecipeSuggestions() {
-        ArrayList<String> matchingRecipes = new ArrayList<>();
+        ArrayList<Recipe> matchingRecipes = new ArrayList<>();
 
-        if (hasIngredients("tomato", "egg")) {
-            matchingRecipes.add("Tomato and egg scramble");
-        }
+        Cursor recipesCursor = databaseHelper.getRecipes();
 
-        if (hasIngredients("egg", "bread")) {
-            matchingRecipes.add("Egg toast");
-        }
+        try {
+            int idColumn = recipesCursor.getColumnIndexOrThrow("_id");
+            int nameColumn = recipesCursor.getColumnIndexOrThrow("name");
+            int instructionsColumn =
+                    recipesCursor.getColumnIndexOrThrow("instructions");
 
-        if (hasIngredients("tomato", "cucumber")) {
-            matchingRecipes.add("Tomato and cucumber salad");
+            while (recipesCursor.moveToNext()) {
+                long recipeId = recipesCursor.getLong(idColumn);
+                String recipeName = recipesCursor.getString(nameColumn);
+                String instructions = recipesCursor.getString(instructionsColumn);
+
+                if (canMakeRecipe(recipeId)) {
+                    matchingRecipes.add(
+                            new Recipe(recipeId, recipeName, instructions)
+                    );
+                }
+            }
+        } finally {
+            recipesCursor.close();
         }
 
         if (matchingRecipes.isEmpty()) {
             new AlertDialog.Builder(this)
                     .setTitle("No recipes available yet")
-                    .setMessage("Add more ingredients to your pantry and check again.")
+                    .setMessage("Add enough ingredients to your pantry and check again.")
                     .setPositiveButton("OK", null)
                     .show();
             return;
         }
 
-        String[] recipeNames = matchingRecipes.toArray(new String[0]);
+        String[] recipeNames = new String[matchingRecipes.size()];
+
+        for (int i = 0; i < matchingRecipes.size(); i++) {
+            recipeNames[i] = matchingRecipes.get(i).name;
+        }
 
         new AlertDialog.Builder(this)
                 .setTitle("Recipes you can make")
                 .setItems(recipeNames, (dialog, which) ->
-                        showRecipeInstructions(recipeNames[which]))
+                        showRecipeInstructions(matchingRecipes.get(which)))
                 .setNegativeButton("Close", null)
                 .show();
     }
 
-    private void showRecipeInstructions(String recipeName) {
-        String instructions;
+    private boolean canMakeRecipe(long recipeId) {
+        Cursor ingredientsCursor =
+                databaseHelper.getRecipeIngredients(recipeId);
 
-        switch (recipeName) {
-            case "Tomato and egg scramble":
-                instructions = "1. Wash and chop the tomato.\n"
-                        + "2. Beat the eggs in a bowl.\n"
-                        + "3. Cook the tomato in a pan for a few minutes.\n"
-                        + "4. Add the eggs and stir until fully cooked.";
-                break;
+        try {
+            int nameColumn =
+                    ingredientsCursor.getColumnIndexOrThrow("ingredient_name");
+            int quantityColumn =
+                    ingredientsCursor.getColumnIndexOrThrow("required_quantity");
+            int unitColumn =
+                    ingredientsCursor.getColumnIndexOrThrow("unit");
 
-            case "Egg toast":
-                instructions = "1. Toast the bread.\n"
-                        + "2. Cook the egg in a pan until done.\n"
-                        + "3. Place the cooked egg on the toast and serve.";
-                break;
-
-            case "Tomato and cucumber salad":
-                instructions = "1. Wash the tomato and cucumber.\n"
-                        + "2. Chop them into small pieces.\n"
-                        + "3. Mix together in a bowl and serve.";
-                break;
-
-            default:
-                instructions = "Instructions are not available for this recipe.";
-                break;
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle(recipeName)
-                .setMessage(instructions)
-                .setPositiveButton("Close", null)
-                .show();
-    }
-
-    private boolean hasIngredients(String... requiredIngredients) {
-        for (String required : requiredIngredients) {
-            if (!hasIngredient(required)) {
+            if (!ingredientsCursor.moveToFirst()) {
                 return false;
             }
+
+            do {
+                String ingredientName = ingredientsCursor.getString(nameColumn);
+                double requiredQuantity =
+                        ingredientsCursor.getDouble(quantityColumn);
+                String requiredUnit = ingredientsCursor.getString(unitColumn);
+
+                if (!hasEnoughIngredient(
+                        ingredientName,
+                        requiredQuantity,
+                        requiredUnit
+                )) {
+                    return false;
+                }
+            } while (ingredientsCursor.moveToNext());
+
+            return true;
+        } finally {
+            ingredientsCursor.close();
         }
-        return true;
     }
 
-    private boolean hasIngredient(String requiredIngredient) {
-        for (PantryItemAdapter.PantryItem item : pantryItems) {
-            String name = item.getName().trim().toLowerCase(Locale.ROOT);
+    private boolean hasEnoughIngredient(
+            String requiredName,
+            double requiredQuantity,
+            String requiredUnit
+    ) {
+        String wantedName = normalizeIngredientName(requiredName);
+        String wantedUnit = normalizeUnit(requiredUnit);
 
-            if (name.equals(requiredIngredient)
-                    || name.equals(requiredIngredient + "s")
-                    || (requiredIngredient.equals("tomato") && name.equals("tomatoes"))) {
-                return true;
+        double requiredBaseQuantity =
+                toBaseQuantity(requiredQuantity, requiredUnit);
+
+        if (requiredBaseQuantity < 0) {
+            return false;
+        }
+
+        double availableBaseQuantity = 0;
+
+        for (PantryItemAdapter.PantryItem item : pantryItems) {
+            String pantryName = normalizeIngredientName(item.getName());
+            String pantryUnit = normalizeUnit(item.getUnit());
+
+            if (pantryName.equals(wantedName)
+                    && pantryUnit.equals(wantedUnit)) {
+                double pantryBaseQuantity =
+                        toBaseQuantity(item.getQuantity(), item.getUnit());
+
+                if (pantryBaseQuantity >= 0) {
+                    availableBaseQuantity += pantryBaseQuantity;
+                }
             }
         }
-        return false;
+
+        return availableBaseQuantity >= requiredBaseQuantity;
+    }
+
+    private String normalizeIngredientName(String name) {
+        String normalized = name.trim().toLowerCase(Locale.ROOT);
+
+        if (normalized.equals("tomatoes")) {
+            return "tomato";
+        }
+        if (normalized.equals("potatoes")) {
+            return "potato";
+        }
+        if (normalized.equals("eggs")) {
+            return "egg";
+        }
+        if (normalized.equals("peas")) {
+            return "pea";
+        }
+        if (normalized.endsWith("ies") && normalized.length() > 3) {
+            return normalized.substring(0, normalized.length() - 3) + "y";
+        }
+        if (normalized.endsWith("s") && normalized.length() > 1) {
+            return normalized.substring(0, normalized.length() - 1);
+        }
+
+        return normalized;
+    }
+
+    private String normalizeUnit(String unit) {
+        String normalized = unit.trim().toLowerCase(Locale.ROOT);
+
+        if (normalized.equals("piece") || normalized.equals("pieces")
+                || normalized.equals("pc") || normalized.equals("pcs")) {
+            return "piece";
+        }
+        if (normalized.equals("slice") || normalized.equals("slices")) {
+            return "slice";
+        }
+        if (normalized.equals("g") || normalized.equals("gram")
+                || normalized.equals("grams") || normalized.equals("kg")
+                || normalized.equals("kilogram")
+                || normalized.equals("kilograms")) {
+            return "gram";
+        }
+        if (normalized.equals("ml") || normalized.equals("milliliter")
+                || normalized.equals("milliliters")
+                || normalized.equals("millilitre")
+                || normalized.equals("millilitres")
+                || normalized.equals("l") || normalized.equals("liter")
+                || normalized.equals("liters") || normalized.equals("litre")
+                || normalized.equals("litres")) {
+            return "ml";
+        }
+
+        return normalized;
+    }
+
+    private double toBaseQuantity(double quantity, String unit) {
+        String normalized = unit.trim().toLowerCase(Locale.ROOT);
+
+        if (normalized.equals("kg")
+                || normalized.equals("kilogram")
+                || normalized.equals("kilograms")) {
+            return quantity * 1000;
+        }
+
+        if (normalized.equals("l") || normalized.equals("liter")
+                || normalized.equals("liters") || normalized.equals("litre")
+                || normalized.equals("litres")) {
+            return quantity * 1000;
+        }
+
+        if (normalizeUnit(unit).equals("piece")
+                || normalizeUnit(unit).equals("slice")
+                || normalizeUnit(unit).equals("gram")
+                || normalizeUnit(unit).equals("ml")) {
+            return quantity;
+        }
+
+        return -1;
+    }
+
+    private void showRecipeInstructions(Recipe recipe) {
+        new AlertDialog.Builder(this)
+                .setTitle(recipe.name)
+                .setMessage(recipe.instructions)
+                .setPositiveButton("Close", null)
+                .show();
     }
 
     private void showSettings() {
@@ -424,5 +541,17 @@ public class MainActivity extends AppCompatActivity {
             databaseHelper.close();
         }
         super.onDestroy();
+    }
+
+    private static class Recipe {
+        final long id;
+        final String name;
+        final String instructions;
+
+        Recipe(long id, String name, String instructions) {
+            this.id = id;
+            this.name = name;
+            this.instructions = instructions;
+        }
     }
 }

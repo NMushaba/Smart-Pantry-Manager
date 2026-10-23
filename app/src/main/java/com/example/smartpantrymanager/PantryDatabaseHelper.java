@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class PantryDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "smart_pantry.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
     private static final String LEGACY_PANTRY_TABLE = "pantry_items_legacy";
 
     public static final String PANTRY_TABLE = "pantry_items";
@@ -32,17 +32,34 @@ public class PantryDatabaseHelper extends SQLiteOpenHelper {
     }
 
     @Override
+    public void onOpen(SQLiteDatabase database) {
+        super.onOpen(database);
+        seedRecipesIfEmpty(database);
+    }
+
+    @Override
     public void onUpgrade(SQLiteDatabase database, int oldVersion, int newVersion) {
         if (oldVersion < 2 && tableExists(database, PANTRY_TABLE)) {
             database.execSQL(
-                    "ALTER TABLE " + PANTRY_TABLE +
-                            " RENAME TO " + LEGACY_PANTRY_TABLE
+                    "ALTER TABLE " + PANTRY_TABLE
+                            + " RENAME TO " + LEGACY_PANTRY_TABLE
             );
 
             createTables(database);
             copyLegacyPantryItems(database);
             database.execSQL("DROP TABLE " + LEGACY_PANTRY_TABLE);
         } else {
+            createTables(database);
+        }
+
+        if (oldVersion < 3) {
+            database.execSQL(
+                    "DROP TABLE IF EXISTS " + RECIPE_INGREDIENTS_TABLE
+            );
+            database.execSQL(
+                    "DROP TABLE IF EXISTS " + RECIPES_TABLE
+            );
+
             createTables(database);
         }
     }
@@ -105,6 +122,183 @@ public class PantryDatabaseHelper extends SQLiteOpenHelper {
             }
         } finally {
             cursor.close();
+        }
+    }
+
+    private void seedRecipesIfEmpty(SQLiteDatabase database) {
+        Cursor cursor = database.rawQuery(
+                "SELECT COUNT(*) FROM " + RECIPES_TABLE,
+                null
+        );
+
+        try {
+            if (cursor.moveToFirst() && cursor.getInt(0) > 0) {
+                return;
+            }
+        } finally {
+            cursor.close();
+        }
+
+        database.beginTransaction();
+
+        try {
+            seedRecipe(database, "Tomato and egg scramble",
+                    "1. Chop the tomato. 2. Beat the eggs. 3. Cook the tomato, add the eggs, and stir until fully cooked.",
+                    new SeedIngredient("tomato", 1, "pieces"),
+                    new SeedIngredient("egg", 2, "pieces"));
+
+            seedRecipe(database, "Egg toast",
+                    "1. Toast the bread. 2. Cook the egg until done. 3. Serve the egg on the toast.",
+                    new SeedIngredient("egg", 1, "pieces"),
+                    new SeedIngredient("bread", 2, "slices"));
+
+            seedRecipe(database, "Tomato and cucumber salad",
+                    "1. Wash and chop the tomato and cucumber. 2. Mix them together and serve.",
+                    new SeedIngredient("tomato", 1, "pieces"),
+                    new SeedIngredient("cucumber", 1, "pieces"));
+
+            seedRecipe(database, "Vegetable omelette",
+                    "1. Beat the eggs. 2. Chop the tomato and onion. 3. Cook the vegetables with the eggs until done.",
+                    new SeedIngredient("egg", 2, "pieces"),
+                    new SeedIngredient("tomato", 1, "pieces"),
+                    new SeedIngredient("onion", 0.5, "pieces"));
+
+            seedRecipe(database, "Banana pancakes",
+                    "1. Mash the banana. 2. Mix with eggs and flour. 3. Cook small pancakes in a pan.",
+                    new SeedIngredient("banana", 1, "pieces"),
+                    new SeedIngredient("egg", 2, "pieces"),
+                    new SeedIngredient("flour", 50, "grams"));
+
+            seedRecipe(database, "Peanut butter toast",
+                    "1. Toast the bread. 2. Spread peanut butter on each slice.",
+                    new SeedIngredient("bread", 2, "slices"),
+                    new SeedIngredient("peanut butter", 30, "grams"));
+
+            seedRecipe(database, "Tomato pasta",
+                    "1. Cook the pasta. 2. Chop and cook the tomatoes and onion in olive oil. 3. Mix with the pasta.",
+                    new SeedIngredient("pasta", 100, "grams"),
+                    new SeedIngredient("tomato", 2, "pieces"),
+                    new SeedIngredient("onion", 1, "pieces"),
+                    new SeedIngredient("olive oil", 10, "ml"));
+
+            seedRecipe(database, "Fried rice",
+                    "1. Cook the rice. 2. Cook the egg and carrot. 3. Add rice, peas, and soy sauce, then stir.",
+                    new SeedIngredient("rice", 150, "grams"),
+                    new SeedIngredient("egg", 1, "pieces"),
+                    new SeedIngredient("carrot", 1, "pieces"),
+                    new SeedIngredient("peas", 50, "grams"),
+                    new SeedIngredient("soy sauce", 10, "ml"));
+
+            seedRecipe(database, "Vegetable stir-fry",
+                    "1. Chop and cook the carrot and broccoli. 2. Add oil and soy sauce. 3. Stir until tender.",
+                    new SeedIngredient("carrot", 1, "pieces"),
+                    new SeedIngredient("broccoli", 100, "grams"),
+                    new SeedIngredient("soy sauce", 15, "ml"),
+                    new SeedIngredient("olive oil", 10, "ml"));
+
+            seedRecipe(database, "Potato omelette",
+                    "1. Chop and cook the potato and onion. 2. Add beaten eggs. 3. Cook until the eggs are done.",
+                    new SeedIngredient("potato", 1, "pieces"),
+                    new SeedIngredient("egg", 2, "pieces"),
+                    new SeedIngredient("onion", 0.5, "pieces"));
+
+            seedRecipe(database, "Fruit salad",
+                    "1. Wash and chop the apple, banana, and orange. 2. Mix and serve.",
+                    new SeedIngredient("apple", 1, "pieces"),
+                    new SeedIngredient("banana", 1, "pieces"),
+                    new SeedIngredient("orange", 1, "pieces"));
+
+            seedRecipe(database, "Chicken sandwich",
+                    "1. Cook the chicken thoroughly. 2. Put chicken, lettuce, and mayonnaise between slices of bread.",
+                    new SeedIngredient("bread", 2, "slices"),
+                    new SeedIngredient("chicken", 100, "grams"),
+                    new SeedIngredient("lettuce", 20, "grams"),
+                    new SeedIngredient("mayonnaise", 15, "grams"));
+
+            seedRecipe(database, "Tuna salad",
+                    "1. Drain the tuna. 2. Chop the lettuce and cucumber. 3. Mix with mayonnaise.",
+                    new SeedIngredient("tuna", 80, "grams"),
+                    new SeedIngredient("lettuce", 30, "grams"),
+                    new SeedIngredient("cucumber", 0.5, "pieces"),
+                    new SeedIngredient("mayonnaise", 10, "grams"));
+
+            seedRecipe(database, "Banana oatmeal",
+                    "1. Cook the oats with milk. 2. Slice the banana and add it to the oatmeal.",
+                    new SeedIngredient("oats", 50, "grams"),
+                    new SeedIngredient("milk", 200, "ml"),
+                    new SeedIngredient("banana", 1, "pieces"));
+
+            seedRecipe(database, "Grilled cheese",
+                    "1. Put cheese between slices of bread. 2. Butter the outside. 3. Cook both sides until golden.",
+                    new SeedIngredient("bread", 2, "slices"),
+                    new SeedIngredient("cheese", 40, "grams"),
+                    new SeedIngredient("butter", 10, "grams"));
+
+            seedRecipe(database, "Vegetable soup",
+                    "1. Chop the potato, carrot, and onion. 2. Simmer them in broth until tender.",
+                    new SeedIngredient("potato", 1, "pieces"),
+                    new SeedIngredient("carrot", 1, "pieces"),
+                    new SeedIngredient("onion", 0.5, "pieces"),
+                    new SeedIngredient("broth", 250, "ml"));
+
+            seedRecipe(database, "Banana smoothie",
+                    "1. Peel the banana. 2. Blend it with milk and honey until smooth.",
+                    new SeedIngredient("banana", 1, "pieces"),
+                    new SeedIngredient("milk", 200, "ml"),
+                    new SeedIngredient("honey", 10, "grams"));
+
+            seedRecipe(database, "Cheese omelette",
+                    "1. Beat the eggs. 2. Cook them in a pan with butter. 3. Add cheese and fold the omelette.",
+                    new SeedIngredient("egg", 2, "pieces"),
+                    new SeedIngredient("cheese", 30, "grams"),
+                    new SeedIngredient("butter", 5, "grams"));
+
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
+    }
+
+    private void seedRecipe(
+            SQLiteDatabase database,
+            String name,
+            String instructions,
+            SeedIngredient... ingredients
+    ) {
+        ContentValues recipeValues = new ContentValues();
+        recipeValues.put("name", name);
+        recipeValues.put("instructions", instructions);
+
+        long recipeId = database.insertOrThrow(
+                RECIPES_TABLE,
+                null,
+                recipeValues
+        );
+
+        for (SeedIngredient ingredient : ingredients) {
+            ContentValues ingredientValues = new ContentValues();
+            ingredientValues.put("recipe_id", recipeId);
+            ingredientValues.put("ingredient_name", ingredient.name);
+            ingredientValues.put("required_quantity", ingredient.quantity);
+            ingredientValues.put("unit", ingredient.unit);
+
+            database.insertOrThrow(
+                    RECIPE_INGREDIENTS_TABLE,
+                    null,
+                    ingredientValues
+            );
+        }
+    }
+
+    private static class SeedIngredient {
+        final String name;
+        final double quantity;
+        final String unit;
+
+        SeedIngredient(String name, double quantity, String unit) {
+            this.name = name;
+            this.quantity = quantity;
+            this.unit = unit;
         }
     }
 
