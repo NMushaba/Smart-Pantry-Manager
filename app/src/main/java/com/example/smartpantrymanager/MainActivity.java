@@ -1,7 +1,9 @@
 package com.example.smartpantrymanager;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -17,9 +19,15 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String PREFERENCES_NAME = "smart_pantry";
+    private static final String INGREDIENTS_KEY = "ingredients";
 
     private LinearLayout pantryIngredientsContainer;
     private ScrollView pantryListScroll;
@@ -46,6 +54,8 @@ public class MainActivity extends AppCompatActivity {
         pantryIngredientsContainer = findViewById(R.id.pantryIngredientsContainer);
         pantryListScroll = findViewById(R.id.pantryListScroll);
         emptyPantryMessage = findViewById(R.id.emptyPantryMessage);
+
+        loadIngredients();
 
         Button addIngredientButton = findViewById(R.id.addIngredientButton);
         addIngredientButton.setOnClickListener(view -> showAddIngredientForm());
@@ -101,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
                     String ingredient = name + " — " + quantity + " " + unit;
                     ingredients.add(ingredient);
                     addIngredientToScreen(ingredient);
+                    saveIngredients();
                     dialog.dismiss();
                 })
         );
@@ -111,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
     private void addIngredientToScreen(String ingredient) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
 
         int padding = (int) (8 * getResources().getDisplayMetrics().density);
         row.setPadding(padding, padding, padding, padding);
@@ -135,6 +146,7 @@ public class MainActivity extends AppCompatActivity {
         removeButton.setOnClickListener(view -> {
             ingredients.remove(ingredient);
             pantryIngredientsContainer.removeView(row);
+            saveIngredients();
 
             if (ingredients.isEmpty()) {
                 emptyPantryMessage.setVisibility(View.VISIBLE);
@@ -145,5 +157,40 @@ public class MainActivity extends AppCompatActivity {
         pantryIngredientsContainer.addView(row);
         emptyPantryMessage.setVisibility(View.GONE);
         pantryListScroll.setVisibility(View.VISIBLE);
+    }
+
+    private void saveIngredients() {
+        JSONArray jsonArray = new JSONArray();
+
+        for (String ingredient : ingredients) {
+            jsonArray.put(ingredient);
+        }
+
+        SharedPreferences preferences =
+                getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
+        preferences.edit()
+                .putString(INGREDIENTS_KEY, jsonArray.toString())
+                .apply();
+    }
+
+    private void loadIngredients() {
+        SharedPreferences preferences =
+                getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
+        String savedIngredients = preferences.getString(INGREDIENTS_KEY, "[]");
+
+        try {
+            JSONArray jsonArray = new JSONArray(savedIngredients);
+
+            for (int i = 0; i < jsonArray.length(); i++) {
+                String ingredient = jsonArray.getString(i);
+                ingredients.add(ingredient);
+                addIngredientToScreen(ingredient);
+            }
+        } catch (JSONException exception) {
+            ingredients.clear();
+            pantryIngredientsContainer.removeAllViews();
+            emptyPantryMessage.setVisibility(View.VISIBLE);
+            pantryListScroll.setVisibility(View.GONE);
+        }
     }
 }
