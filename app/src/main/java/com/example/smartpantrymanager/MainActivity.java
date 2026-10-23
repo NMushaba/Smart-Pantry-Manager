@@ -109,15 +109,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addIngredientToScreen(String ingredient) {
-        TextView ingredientRow = new TextView(this);
-        ingredientRow.setText(ingredient);
-        ingredientRow.setTextSize(18);
-        ingredientRow.setTextColor(0xFF29252F);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        int padding = (int) (16 * getResources().getDisplayMetrics().density);
-        ingredientRow.setPadding(padding, padding, padding, padding);
+        int padding = (int) (8 * getResources().getDisplayMetrics().density);
+        row.setPadding(padding, padding, padding, padding);
 
-        pantryIngredientsContainer.addView(ingredientRow);
+        TextView ingredientText = new TextView(this);
+        ingredientText.setText(ingredient);
+        ingredientText.setTextSize(16);
+        ingredientText.setTextColor(0xFF29252F);
+
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        row.addView(ingredientText, textParams);
+
+        Button removeButton = new Button(this);
+        removeButton.setText("Remove");
+        row.addView(removeButton);
+
+        removeButton.setOnClickListener(view -> {
+            ingredients.remove(ingredient);
+            pantryIngredientsContainer.removeView(row);
+
+            if (ingredients.isEmpty()) {
+                emptyPantryMessage.setVisibility(View.VISIBLE);
+                pantryListScroll.setVisibility(View.GONE);
+            }
+        });
+
+        pantryIngredientsContainer.addView(row);
         emptyPantryMessage.setVisibility(View.GONE);
         pantryListScroll.setVisibility(View.VISIBLE);
     }
