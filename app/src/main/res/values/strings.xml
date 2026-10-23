@@ -4,4 +4,6 @@
     <string name="pantry_subtitle">Use what you already have at home.</string>
     <string name="add_ingredient">Add ingredient</string>
     <string name="pantry_empty">Your pantry is empty.\nAdd an ingredient to get started.</string>
+    <string name="recipe_details_title">Recipe details</string>
+    <string name="back_to_recipes">Back to recipes</string>
 </resources>
