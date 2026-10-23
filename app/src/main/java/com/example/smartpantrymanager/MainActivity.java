@@ -1,6 +1,6 @@
 package com.example.smartpantrymanager;
 
-import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -19,16 +19,11 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String PREFERENCES_NAME = "smart_pantry";
-    private static final String INGREDIENTS_KEY = "ingredients";
-
+    private PantryDatabaseHelper databaseHelper;
     private LinearLayout pantryIngredientsContainer;
     private ScrollView pantryListScroll;
     private TextView emptyPantryMessage;
@@ -55,7 +50,8 @@ public class MainActivity extends AppCompatActivity {
         pantryListScroll = findViewById(R.id.pantryListScroll);
         emptyPantryMessage = findViewById(R.id.emptyPantryMessage);
 
-        loadIngredients();
+        databaseHelper = new PantryDatabaseHelper(this);
+        loadIngredientsFromDatabase();
 
         Button addIngredientButton = findViewById(R.id.addIngredientButton);
         addIngredientButton.setOnClickListener(view -> showAddIngredientForm());
@@ -102,10 +98,10 @@ public class MainActivity extends AppCompatActivity {
         dialog.setOnShowListener(dialogInterface ->
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
                     String name = nameInput.getText().toString().trim();
-                    String quantity = quantityInput.getText().toString().trim();
+                    String quantityText = quantityInput.getText().toString().trim();
                     String unit = unitInput.getText().toString().trim();
 
-                    if (name.isEmpty() || quantity.isEmpty() || unit.isEmpty()) {
+                    if (name.isEmpty() || quantityText.isEmpty() || unit.isEmpty()) {
                         Toast.makeText(
                                 this,
                                 "Please fill in all fields.",
@@ -114,10 +110,40 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    String ingredient = name + " — " + quantity + " " + unit;
-                    ingredients.add(ingredient);
-                    addIngredientToScreen(ingredient);
-                    saveIngredients();
+                    double quantity;
+                    try {
+                        quantity = Double.parseDouble(quantityText);
+                    } catch (NumberFormatException exception) {
+                        Toast.makeText(
+                                this,
+                                "Enter a valid quantity.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
+
+                    if (quantity <= 0) {
+                        Toast.makeText(
+                                this,
+                                "Quantity must be greater than zero.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
+
+                    long itemId = databaseHelper.addPantryItem(name, quantity, unit);
+
+                    if (itemId == -1) {
+                        Toast.makeText(
+                                this,
+                                "The ingredient could not be saved.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
+
+                    ingredients.add(name);
+                    addIngredientToScreen(itemId, name, quantity, unit);
                     dialog.dismiss();
                 })
         );
@@ -125,7 +151,40 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private void addIngredientToScreen(String ingredient) {
+    private void loadIngredientsFromDatabase() {
+        ingredients.clear();
+        pantryIngredientsContainer.removeAllViews();
+
+        Cursor cursor = databaseHelper.getPantryItems();
+
+        try {
+            int idColumn = cursor.getColumnIndexOrThrow("_id");
+            int nameColumn = cursor.getColumnIndexOrThrow("name");
+            int quantityColumn = cursor.getColumnIndexOrThrow("quantity");
+            int unitColumn = cursor.getColumnIndexOrThrow("unit");
+
+            while (cursor.moveToNext()) {
+                long itemId = cursor.getLong(idColumn);
+                String name = cursor.getString(nameColumn);
+                double quantity = cursor.getDouble(quantityColumn);
+                String unit = cursor.getString(unitColumn);
+
+                ingredients.add(name);
+                addIngredientToScreen(itemId, name, quantity, unit);
+            }
+        } finally {
+            cursor.close();
+        }
+
+        updatePantryVisibility();
+    }
+
+    private void addIngredientToScreen(
+            long itemId,
+            String name,
+            double quantity,
+            String unit
+    ) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -134,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
         row.setPadding(padding, padding, padding, padding);
 
         TextView ingredientText = new TextView(this);
-        ingredientText.setText(ingredient);
+        ingredientText.setText(name + " — " + quantity + " " + unit);
         ingredientText.setTextSize(16);
         ingredientText.setTextColor(0xFF29252F);
 
@@ -150,54 +209,28 @@ public class MainActivity extends AppCompatActivity {
         row.addView(removeButton);
 
         removeButton.setOnClickListener(view -> {
-            ingredients.remove(ingredient);
-            pantryIngredientsContainer.removeView(row);
-            saveIngredients();
+            int deletedRows = databaseHelper.deletePantryItem(itemId);
 
-            if (ingredients.isEmpty()) {
-                emptyPantryMessage.setVisibility(View.VISIBLE);
-                pantryListScroll.setVisibility(View.GONE);
+            if (deletedRows > 0) {
+                ingredients.remove(name);
+                pantryIngredientsContainer.removeView(row);
+                updatePantryVisibility();
             }
         });
 
         pantryIngredientsContainer.addView(row);
-        emptyPantryMessage.setVisibility(View.GONE);
-        pantryListScroll.setVisibility(View.VISIBLE);
+        updatePantryVisibility();
     }
 
-    private void saveIngredients() {
-        JSONArray jsonArray = new JSONArray();
+    private void updatePantryVisibility() {
+        boolean pantryIsEmpty = ingredients.isEmpty();
 
-        for (String ingredient : ingredients) {
-            jsonArray.put(ingredient);
-        }
-
-        SharedPreferences preferences =
-                getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
-        preferences.edit()
-                .putString(INGREDIENTS_KEY, jsonArray.toString())
-                .apply();
-    }
-
-    private void loadIngredients() {
-        SharedPreferences preferences =
-                getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
-        String savedIngredients = preferences.getString(INGREDIENTS_KEY, "[]");
-
-        try {
-            JSONArray jsonArray = new JSONArray(savedIngredients);
-
-            for (int i = 0; i < jsonArray.length(); i++) {
-                String ingredient = jsonArray.getString(i);
-                ingredients.add(ingredient);
-                addIngredientToScreen(ingredient);
-            }
-        } catch (JSONException exception) {
-            ingredients.clear();
-            pantryIngredientsContainer.removeAllViews();
-            emptyPantryMessage.setVisibility(View.VISIBLE);
-            pantryListScroll.setVisibility(View.GONE);
-        }
+        emptyPantryMessage.setVisibility(
+                pantryIsEmpty ? View.VISIBLE : View.GONE
+        );
+        pantryListScroll.setVisibility(
+                pantryIsEmpty ? View.GONE : View.VISIBLE
+        );
     }
 
     private void showRecipeSuggestions() {
@@ -280,8 +313,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean hasIngredient(String requiredIngredient) {
         for (String savedIngredient : ingredients) {
-            String[] parts = savedIngredient.split(" — ", 2);
-            String name = parts[0].trim().toLowerCase();
+            String name = savedIngredient.trim().toLowerCase();
 
             if (name.equals(requiredIngredient)
                     || name.equals(requiredIngredient + "s")
@@ -296,7 +328,8 @@ public class MainActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("Settings")
                 .setMessage("Ingredients saved: " + ingredients.size())
-                .setPositiveButton("Clear pantry", (dialog, which) -> confirmClearPantry())
+                .setPositiveButton("Clear pantry", (dialog, which) ->
+                        confirmClearPantry())
                 .setNegativeButton("Close", null)
                 .show();
     }
@@ -311,13 +344,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearPantry() {
+        databaseHelper.clearPantry();
         ingredients.clear();
         pantryIngredientsContainer.removeAllViews();
-        saveIngredients();
-
-        emptyPantryMessage.setVisibility(View.VISIBLE);
-        pantryListScroll.setVisibility(View.GONE);
+        updatePantryVisibility();
 
         Toast.makeText(this, "Pantry cleared.", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        databaseHelper.close();
+        super.onDestroy();
     }
 }
