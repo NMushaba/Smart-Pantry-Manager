@@ -62,6 +62,9 @@ public class MainActivity extends AppCompatActivity {
 
         Button findRecipesButton = findViewById(R.id.findRecipesButton);
         findRecipesButton.setOnClickListener(view -> showRecipeSuggestions());
+
+        Button settingsButton = findViewById(R.id.settingsButton);
+        settingsButton.setOnClickListener(view -> showSettings());
     }
 
     private void showAddIngredientForm() {
@@ -287,5 +290,34 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return false;
+    }
+
+    private void showSettings() {
+        new AlertDialog.Builder(this)
+                .setTitle("Settings")
+                .setMessage("Ingredients saved: " + ingredients.size())
+                .setPositiveButton("Clear pantry", (dialog, which) -> confirmClearPantry())
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void confirmClearPantry() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear pantry?")
+                .setMessage("This will remove all saved ingredients.")
+                .setPositiveButton("Clear", (dialog, which) -> clearPantry())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void clearPantry() {
+        ingredients.clear();
+        pantryIngredientsContainer.removeAllViews();
+        saveIngredients();
+
+        emptyPantryMessage.setVisibility(View.VISIBLE);
+        pantryListScroll.setVisibility(View.GONE);
+
+        Toast.makeText(this, "Pantry cleared.", Toast.LENGTH_SHORT).show();
     }
 }
