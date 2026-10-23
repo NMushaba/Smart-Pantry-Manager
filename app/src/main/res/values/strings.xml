@@ -6,4 +6,16 @@
     <string name="pantry_empty">Your pantry is empty.\nAdd an ingredient to get started.</string>
     <string name="recipe_details_title">Recipe details</string>
     <string name="back_to_recipes">Back to recipes</string>
+    <string name="ingredient_form_title">Ingredient</string>
+    <string name="ingredient_name_hint">Ingredient name</string>
+    <string name="ingredient_quantity_hint">Quantity</string>
+    <string name="ingredient_unit_hint">Unit, for example pieces or grams</string>
+    <string name="save_ingredient">Save ingredient</string>
+    <string name="cancel">Cancel</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_ingredient_count">Ingredients saved: %1$d</string>
+    <string name="clear_pantry">Clear pantry</string>
+    <string name="clear_pantry_confirmation_title">Clear pantry?</string>
+    <string name="clear_pantry_confirmation_message">This will remove all saved ingredients.</string>
+    <string name="back_to_pantry">Back to pantry</string>
 </resources>

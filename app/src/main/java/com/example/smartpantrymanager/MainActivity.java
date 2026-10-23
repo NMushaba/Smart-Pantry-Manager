@@ -3,17 +3,12 @@ package com.example.smartpantrymanager;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -60,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
                 new PantryItemAdapter.ItemActions() {
                     @Override
                     public void onEdit(PantryItemAdapter.PantryItem item) {
-                        showEditIngredientForm(item);
+                        openEditIngredientForm(item);
                     }
 
                     @Override
@@ -71,10 +66,9 @@ public class MainActivity extends AppCompatActivity {
         );
 
         pantryListView.setAdapter(pantryAdapter);
-        loadIngredientsFromDatabase();
 
         Button addIngredientButton = findViewById(R.id.addIngredientButton);
-        addIngredientButton.setOnClickListener(view -> showAddIngredientForm());
+        addIngredientButton.setOnClickListener(view -> openAddIngredientForm());
 
         Button findRecipesButton = findViewById(R.id.findRecipesButton);
         findRecipesButton.setOnClickListener(view ->
@@ -82,166 +76,32 @@ public class MainActivity extends AppCompatActivity {
         );
 
         Button settingsButton = findViewById(R.id.settingsButton);
-        settingsButton.setOnClickListener(view -> showSettings());
-    }
-
-    private void showAddIngredientForm() {
-        LinearLayout form = createIngredientForm();
-
-        EditText nameInput = (EditText) form.getChildAt(0);
-        EditText quantityInput = (EditText) form.getChildAt(1);
-        EditText unitInput = (EditText) form.getChildAt(2);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Add ingredient")
-                .setView(form)
-                .setPositiveButton("Add", null)
-                .setNegativeButton("Cancel", null)
-                .create();
-
-        dialog.setOnShowListener(dialogInterface ->
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-                    String name = nameInput.getText().toString().trim();
-                    String quantityText = quantityInput.getText().toString().trim();
-                    String unit = unitInput.getText().toString().trim();
-
-                    if (name.isEmpty() || quantityText.isEmpty() || unit.isEmpty()) {
-                        showMessage("Please fill in all fields.");
-                        return;
-                    }
-
-                    Double quantity = parsePositiveQuantity(quantityText);
-                    if (quantity == null) {
-                        showMessage("Enter a quantity greater than zero.");
-                        return;
-                    }
-
-                    long itemId = databaseHelper.addPantryItem(name, quantity, unit);
-
-                    if (itemId == -1) {
-                        showMessage("The ingredient could not be saved.");
-                        return;
-                    }
-
-                    pantryItems.add(new PantryItemAdapter.PantryItem(
-                            itemId, name, quantity, unit
-                    ));
-                    pantryAdapter.notifyDataSetChanged();
-                    updatePantryVisibility();
-                    dialog.dismiss();
-                })
+        settingsButton.setOnClickListener(view ->
+                startActivity(new Intent(MainActivity.this, SettingsActivity.class))
         );
-
-        dialog.show();
     }
 
-    private void showEditIngredientForm(PantryItemAdapter.PantryItem item) {
-        LinearLayout form = createIngredientForm();
-
-        EditText nameInput = (EditText) form.getChildAt(0);
-        EditText quantityInput = (EditText) form.getChildAt(1);
-        EditText unitInput = (EditText) form.getChildAt(2);
-
-        nameInput.setText(item.getName());
-        quantityInput.setText(String.valueOf(item.getQuantity()));
-        unitInput.setText(item.getUnit());
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Edit ingredient")
-                .setView(form)
-                .setPositiveButton("Save", null)
-                .setNegativeButton("Cancel", null)
-                .create();
-
-        dialog.setOnShowListener(dialogInterface ->
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-                    String newName = nameInput.getText().toString().trim();
-                    String quantityText = quantityInput.getText().toString().trim();
-                    String newUnit = unitInput.getText().toString().trim();
-
-                    if (newName.isEmpty() || quantityText.isEmpty() || newUnit.isEmpty()) {
-                        showMessage("Please fill in all fields.");
-                        return;
-                    }
-
-                    Double newQuantity = parsePositiveQuantity(quantityText);
-                    if (newQuantity == null) {
-                        showMessage("Enter a quantity greater than zero.");
-                        return;
-                    }
-
-                    int updatedRows = databaseHelper.updatePantryItem(
-                            item.getId(),
-                            newName,
-                            newQuantity,
-                            newUnit
-                    );
-
-                    if (updatedRows > 0) {
-                        for (int i = 0; i < pantryItems.size(); i++) {
-                            if (pantryItems.get(i).getId() == item.getId()) {
-                                pantryItems.set(
-                                        i,
-                                        new PantryItemAdapter.PantryItem(
-                                                item.getId(),
-                                                newName,
-                                                newQuantity,
-                                                newUnit
-                                        )
-                                );
-                                break;
-                            }
-                        }
-
-                        pantryAdapter.notifyDataSetChanged();
-                        showMessage("Ingredient updated.");
-                        dialog.dismiss();
-                    } else {
-                        showMessage("The ingredient could not be updated.");
-                    }
-                })
-        );
-
-        dialog.show();
+    private void openAddIngredientForm() {
+        Intent intent = new Intent(this, IngredientFormActivity.class);
+        startActivity(intent);
     }
 
-    private LinearLayout createIngredientForm() {
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-
-        int padding = (int) (20 * getResources().getDisplayMetrics().density);
-        form.setPadding(padding, 0, padding, 0);
-
-        EditText nameInput = new EditText(this);
-        nameInput.setHint("Ingredient name");
-        nameInput.setInputType(InputType.TYPE_CLASS_TEXT);
-        form.addView(nameInput);
-
-        EditText quantityInput = new EditText(this);
-        quantityInput.setHint("Quantity");
-        quantityInput.setInputType(
-                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
-        );
-        form.addView(quantityInput);
-
-        EditText unitInput = new EditText(this);
-        unitInput.setHint("Unit, for example pieces or cups");
-        unitInput.setInputType(InputType.TYPE_CLASS_TEXT);
-        form.addView(unitInput);
-
-        return form;
+    private void openEditIngredientForm(PantryItemAdapter.PantryItem item) {
+        Intent intent = new Intent(this, IngredientFormActivity.class);
+        intent.putExtra(IngredientFormActivity.EXTRA_ID, item.getId());
+        intent.putExtra(IngredientFormActivity.EXTRA_NAME, item.getName());
+        intent.putExtra(IngredientFormActivity.EXTRA_QUANTITY, item.getQuantity());
+        intent.putExtra(IngredientFormActivity.EXTRA_UNIT, item.getUnit());
+        startActivity(intent);
     }
 
-    private Double parsePositiveQuantity(String quantityText) {
-        try {
-            double quantity = Double.parseDouble(quantityText);
-            if (quantity > 0) {
-                return quantity;
-            }
-        } catch (NumberFormatException exception) {
-            return null;
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (databaseHelper != null && pantryAdapter != null) {
+            loadIngredientsFromDatabase();
         }
-        return null;
     }
 
     private void loadIngredientsFromDatabase() {
@@ -296,37 +156,6 @@ public class MainActivity extends AppCompatActivity {
         pantryListView.setVisibility(
                 pantryIsEmpty ? View.GONE : View.VISIBLE
         );
-    }
-
-    private void showSettings() {
-        new AlertDialog.Builder(this)
-                .setTitle("Settings")
-                .setMessage("Ingredients saved: " + pantryItems.size())
-                .setPositiveButton("Clear pantry", (dialog, which) ->
-                        confirmClearPantry())
-                .setNegativeButton("Close", null)
-                .show();
-    }
-
-    private void confirmClearPantry() {
-        new AlertDialog.Builder(this)
-                .setTitle("Clear pantry?")
-                .setMessage("This will remove all saved ingredients.")
-                .setPositiveButton("Clear", (dialog, which) -> clearPantry())
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void clearPantry() {
-        databaseHelper.clearPantry();
-        pantryItems.clear();
-        pantryAdapter.notifyDataSetChanged();
-        updatePantryVisibility();
-        showMessage("Pantry cleared.");
-    }
-
-    private void showMessage(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override

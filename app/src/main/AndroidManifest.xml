@@ -28,6 +28,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".IngredientFormActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>
